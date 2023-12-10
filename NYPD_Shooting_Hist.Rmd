@@ -1,0 +1,236 @@
+---
+title: "NYPD_Shooting_hist"
+author: "L. Black"
+date: "2023-12-02"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Import Library and Dataset
+Libraries to be used in this report, tidyverse
+The data set of the Historic NYPD shooting is imported with the URL as a CSV file. The URL variable links the raw data that is read into as "data". The question I am starting with is there any correlation in lethal and non-lethal shootings in communities of high and low wealth and is the poorest borough and percentage of overall . 
+
+
+```{r library, message=FALSE, warning=FALSE}
+#install.packages("tidyverse")
+
+library("tidyverse")
+library("lubridate")
+```
+
+```{r import_data}
+
+url <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+raw_data <- read_csv(url,show_col_types = FALSE)
+
+summary(raw_data)
+
+```
+
+## Tidy Dataset
+Summary and clean up the data. First, the dates within the data set needs to be standardized for easy viewing. Data in relation to reports with shooting incidents that aren't labelled as murders are of interest for the first test set. The other data set is where shooting incidents end in lethally. Any missing data is removed after the interested data is selected, the missing data can be seen in age, race, sex, & most things in relation to identification of a perpetrator.
+
+```{r nonlethal_data}
+
+nonlethal_data <- raw_data %>% filter(STATISTICAL_MURDER_FLAG == FALSE) %>% select(OCCUR_DATE,BORO) %>% drop_na() 
+nonlethal_data$OCCUR_DATE <- mdy(nonlethal_data$OCCUR_DATE)
+
+summary(nonlethal_data)
+
+```
+
+```{r lethal_data_t}
+lethal_data_t <- raw_data %>% filter(STATISTICAL_MURDER_FLAG == TRUE) %>% select(OCCUR_DATE,BORO) %>% drop_na() 
+
+lethal_data_t$OCCUR_DATE <- mdy(lethal_data_t$OCCUR_DATE)
+
+summary(lethal_data_t)
+
+```
+
+## Transform and Visualize Dataset
+
+Grouping the data by date and counted to start to take a look at the trends in shooting victims over the years that didn't result in murder. I am looking to test the data against the wealthiest and poorest boroughs in NYC to see any differences between them in lethal and non-lethal shootings. In these sets we are not looking in specific regions but by dates and count of incidents.   
+
+### Non-Lethal vs Lethal Shooting Reports by NYPD
+
+Transforming the data sets to reflect lethal and non-lethal reports out of the overall data set.The sets are grouped by date and counted. The total of the victims of both reports are of interest not the number of incidents reported. 
+
+```{r transform_tot}
+
+non_lethal_data <- nonlethal_data %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+lethal_data <- lethal_data_t %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+
+head(non_lethal_data)
+head(lethal_data)
+
+```
+
+The visual below is to show how linear the data is over the years for lethal and non-lethal incidents is. Shown in the visual, non-lethal shootings have been on the rise much higher than lethal shooting incidents which can be seen as a positive. Lethal shootings have been on the rise, in a less than 2,500 every 5 years while non-lethal shootings are on the rise on average more than 5,500 every 5 years. 
+
+```{r visual_tot}
+
+ggplot() +
+  geom_line(data = non_lethal_data, aes(x = OCCUR_DATE, y = cumsum(COUNT), color = 'Non-Lethal')) + 
+  geom_line(data = lethal_data, aes(x = OCCUR_DATE, y = cumsum(COUNT), color = 'Lethal')) +
+  labs(title = "Cumulative Non-Lethal & Lethal Shooting Reports by NYPD In NY") +
+  labs(y ="Number of Shooting Victims", x = "Date", color = "Lethality") 
+
+```
+
+
+### Non-Lethal Shooting Reports by Wealthiest & Poorest Borough in New York
+
+This visual for this set in only for Non-lethal shooting reports based on statistically overall most wealthy and most poor of the boroughs in NYC. It is widely believed that the more poor a community is, the higher rate of crime there is but that can also be said for wealth communities being full of crime and shooting because of robberies & burglaries. Overall the Bronx, poor community, has a significantly more non-lethal shootings than Manhattan perhaps by a few thousand. 
+
+```{r ts_nl_data_by_boro_wealth}
+
+bronx_n <- nonlethal_data %>% filter(BORO == "BRONX") %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+manhattan_n <- nonlethal_data %>% filter(BORO == "MANHATTAN") %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+
+```
+
+```{r v_nl_data_by_boro_wealth}
+ggplot() +
+  geom_line(data = bronx_n, aes(x = OCCUR_DATE, y = cumsum(COUNT), color = 'Bronx')) + 
+  geom_line(data = manhattan_n, aes(x = OCCUR_DATE, y = cumsum(COUNT), color = 'Manhattan')) + 
+
+  labs(title = "Non-Lethal Shooting by Wealthiest & Poorest Borough in New York") + 
+  labs(y = "Number of Shootings", x = "Years", color = "Boroughs") 
+```
+
+### Lethal Shooting Reports by Wealthiest & Poorest Borough in New York
+
+This visual for this set in only for Lethal shooting reports based on statistically overall most wealthy and most poor of the boroughs in NYC. It is widely believed that the more poor a community is, the higher rate of crime there is but that can also be said for wealth communities being full of crime and shooting because of robberies & burglaries. Overall the Bronx, poor community, has a significantly more lethal shootings than Manhattan perhaps by a several hundred. 
+
+```{r ts_l_data_by_boro_wealth}
+
+bronx_l <- lethal_data_t %>% filter(BORO == "BRONX") %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+manhattan_l <- lethal_data_t %>% filter(BORO == "MANHATTAN") %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+
+```
+
+```{r v_l_data_by_boro_wealth}
+ggplot() +
+  geom_line(data = bronx_l, aes(x = OCCUR_DATE, y = cumsum(COUNT), color = 'Bronx')) + 
+  geom_line(data = manhattan_l, aes(x = OCCUR_DATE, y = cumsum(COUNT), color = 'Manhattan')) + 
+
+  labs(title = "Lethal Shooting by Wealthiest & Poorest Borough in New York") + 
+  labs(y = "Number of Shootings", x = "Years", color = "Boroughs") 
+```
+
+## Yearly percent change in Lethal & Non-Lethal Shooting by Wealthiest & Poorest Borough
+
+Here we wanted to see the yearly changes between the boroughs of most to least wealth in comparison to the overall percentage from all boroughs. These comparisons will be done for each of lethal and non-lethal shootings for visual purposes. 
+
+```{r ts_data_by_boro_wealth_pct_change}
+overall_yearly_nl <- non_lethal_data
+overall_yearly_nl$OCCUR_DATE <- overall_yearly_nl$OCCUR_DATE %>% year()
+overall_yearly_nl <- overall_yearly_nl %>% group_by(OCCUR_DATE) %>% summarise(COUNT=n()) %>% ungroup()
+overall_pct_nl <- overall_yearly_nl %>% mutate(pct_change = ((COUNT/lag(COUNT) - 1) * 100)) 
+
+summary(overall_pct_nl)
+
+bronx_yearly <- bronx_n
+bronx_yearly$OCCUR_DATE <- bronx_yearly$OCCUR_DATE %>% year()
+bronx_yearly <- bronx_yearly %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+bronx_pct <- bronx_yearly %>% mutate(pct_change = ((COUNT/lag(COUNT) - 1) * 100)) 
+
+manhat_yearly <- manhattan_n
+manhat_yearly$OCCUR_DATE <- manhat_yearly$OCCUR_DATE %>% year()
+manhat_yearly <- manhat_yearly %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+manhat_pct <- manhat_yearly %>% mutate(pct_change = ((COUNT/lag(COUNT) - 1) * 100)) 
+
+summary(bronx_pct)
+summary(manhat_pct)
+
+overall_yearly_l <- lethal_data
+overall_yearly_l$OCCUR_DATE <- overall_yearly_l$OCCUR_DATE %>% year()
+overall_yearly_l <- overall_yearly_l %>% group_by(OCCUR_DATE) %>% summarise(COUNT=n()) %>% ungroup()
+overall_pct_l <- overall_yearly_l %>% mutate(pct_change = ((COUNT/lag(COUNT) - 1) * 100)) 
+
+summary(overall_pct_l)
+
+bronx_yearly_l <- bronx_l
+bronx_yearly_l$OCCUR_DATE <- bronx_yearly_l$OCCUR_DATE %>% year()
+bronx_yearly_l <- bronx_yearly_l %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+bronx_pct_l <- bronx_yearly %>% mutate(pct_change = ((COUNT/lag(COUNT) - 1) * 100)) 
+
+manhat_yearly_l <- manhattan_l
+manhat_yearly_l$OCCUR_DATE <- manhat_yearly_l$OCCUR_DATE %>% year()
+manhat_yearly_l <- manhat_yearly_l %>% group_by(OCCUR_DATE) %>% summarise(COUNT = n()) %>% ungroup()
+manhat_pct_l <- manhat_yearly_l %>% mutate(pct_change = ((COUNT/lag(COUNT) - 1) * 100)) 
+
+summary(bronx_pct_l)
+summary(manhat_pct_l)
+```
+
+
+```{r v_data_by_boro_wealth_pct_change_nl}
+ggplot() +
+  geom_line(data = manhat_pct[-1,],aes(x = `OCCUR_DATE`, y = `pct_change`, color = "Manhattan")) +
+  geom_line(data = bronx_pct[-1,],aes(x = `OCCUR_DATE`, y = `pct_change`, color = "Bronx")) +
+  geom_line(data = overall_pct_nl[-1,],aes(x = `OCCUR_DATE`, y = `pct_change`, color = "Overall Non-lethal")) +
+  
+  labs(title = "Percent Change in NY Non-lethal Shootings: Manhattan vs The Bronx") + 
+  labs(y = "Percent Change in Number of Shooting Victims", x = "Years (2007-2021)") + 
+  scale_x_continuous(breaks = pretty(bronx_pct$OCCUR_DATE, n = 20)) +
+  scale_y_continuous(breaks = pretty(bronx_pct$pct_change, n = 15))
+```
+
+### Analysis
+
+The overall data percent is relatively consistent except for the anomaly of 2020 with a big spike in shootings. The year 2020 was a globally hard time and the spike was higher in Manhattan than The Bronx by over 10% from another. Also of note, Manhattan has larger spikes (dips and peaks) in percentages than the Bronx.
+
+
+```{r v_data_by_boro_wealth_pct_change_l}
+ggplot() +
+  geom_line(data = manhat_pct_l[-1,],aes(x = `OCCUR_DATE`, y = `pct_change`, color = "Manhattan")) +
+  geom_line(data = bronx_pct_l[-1,],aes(x = `OCCUR_DATE`, y = `pct_change`, color = "Bronx")) +
+  geom_line(data = overall_pct_l[-1,],aes(x = `OCCUR_DATE`, y = `pct_change`, color = "Overall lethal")) +
+  
+  labs(title = "Percent Change in NY Lethal Shootings: Manhattan vs The Bronx") + 
+  labs(y = "Percent Change in Number of Shooting Victims", x = "Years (2007-2021)") + 
+  scale_x_continuous(breaks = pretty(bronx_pct_l$OCCUR_DATE, n = 20)) +
+  scale_y_continuous(breaks = pretty(bronx_pct_l$pct_change, n = 15))
+```
+
+### Analysis
+
+Interestingly enough The Bronx follows the Overall lethal trend of percentage while Manhattan has highs peaks and dips not following the percetange of overall. I think it is fair to make the assumption that Manhattan has a greater percentage of all shooting incidents than that of the poorer boroughs. 
+
+## Modeling
+
+Here, a linear regression model is used to compare the correlation between the percent change in shooting
+ incidents in the Overall and the Bronx. There is little to no correlation between the two, which is 
+ evidence that the coincidence in similar percent change in 2020 is an anomaly, likely linked to external
+  factors or global events, like the pandemic.
+
+```{r mode_bpc}
+
+both_data_pct_nl <- merge(overall_pct_nl[-1,],bronx_pct[-1,], by="OCCUR_DATE")
+
+mod <- lm(pct_change.x ~ pct_change.y, data = both_data_pct_nl)
+
+summary(mod)
+
+preds <- both_data_pct_nl %>% mutate(pred = predict(mod))
+
+preds %>% ggplot() + geom_point(aes(x = pct_change.x, y = pct_change.y, color = "Raw Data")) + 
+  geom_line(aes(x = pct_change.x, y = pred, color = "Prediciton")) + 
+  scale_x_continuous(breaks = pretty(both_data_pct_nl$OCCUR_DATE, n = 10)) + 
+  
+  labs(title = "Correlation between Yearly Shootings % Change 
+       in The Bronx and Overall") + 
+  labs(y="The Bronx Yearly Shooting Percent Change", 
+       x="Overall Yearly Shooting Percent Change", color="Legend")
+```
+
+## Bias
+
+Bias here can be on the stereotypes on the type of communities, let alone how fiances play a part in it. Also, the data collection itself may have bias because some areas are over or under reported which can skew the data every which way. Shifts in socio-behavior during the pandemic can be noted throughout the report.
